@@ -3,28 +3,23 @@ package com.purity.puzzle.bean;
 import android.graphics.Bitmap;
 
 /**
+ * 小方块信息
  * Created by purity on 2016/10/2.
  */
 public class GameItemView {
 
-    /**
-     * 每个小方块的信息
-     */
-
     //每个小方块的实际位置x,
-    private int x=0;
+    public int x=0;
     //每个小方块的实际位置y,
-    private int y=0;
+    public int y=0;
     //每个小方块的图片，
-    private Bitmap bm;
+    public Bitmap bm;
     //每个小方块的图片位置x,
-    private int p_x=0;
-
+    public int p_x=0;
     //每个小方块的图片位置y.
-    private int p_y=0;
+    public int p_y=0;
 
     public GameItemView(int x, int y, Bitmap bm) {
-        super();
         this.x = x;
         this.y = y;
         this.bm = bm;
@@ -32,47 +27,9 @@ public class GameItemView {
         this.p_y=y;
     }
 
-    public int getX() {
-        return x;
-    }
-
-    public void setX(int x) {
-        this.x = x;
-    }
-
-    public int getY() {
-        return y;
-    }
-
-
-
-    public Bitmap getBm() {
-        return bm;
-    }
-
-    public void setBm(Bitmap bm) {
-        this.bm = bm;
-    }
-
-    public int getP_x() {
-        return p_x;
-    }
-
-    public void setP_x(int p_x) {
-        this.p_x = p_x;
-    }
-
-    public int getP_y() {
-        return p_y;
-    }
-
-    public void setP_y(int p_y) {
-        this.p_y = p_y;
-    }
-
     /**
      * 判断每个小方块的位置是否正确
-     * @return
+     * @return true 胜利 false 失败
      */
     public boolean isTrue(){
         if (x==p_x&&y==p_y){

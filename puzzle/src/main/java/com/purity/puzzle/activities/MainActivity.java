@@ -21,10 +21,12 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.Animation;
 import android.view.animation.TranslateAnimation;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.purity.puzzle.R;
@@ -64,7 +66,12 @@ public class MainActivity extends AppCompatActivity {
     //操作的步数
     private static int step = 0;
     //图片工具
-    private PhotoUtil photoUtil;
+    private PhotoUtil photoUtil = new PhotoUtil ();
+    //判断是否为刚进去时触发onItemSelected的标志
+    boolean spinnerSelected = false;
+    //难度等级的下拉列表
+    private Spinner spinner;
+    ;
     //实时更新操作的步数
     private Handler handler = new Handler () {
         @Override
@@ -83,7 +90,6 @@ public class MainActivity extends AppCompatActivity {
         initView ();
         initEvent ();
         initDate ();
-        PermissionsUtil.checkAndRequestPermissions (this);
     }
 
     /**
@@ -101,6 +107,8 @@ public class MainActivity extends AppCompatActivity {
         bt_tupan = bitmapDrawable.getBitmap ();//得到默认图片的Bitmap,便于切小图
         gl_game_layout = (GridLayout) findViewById (R.id.gl);
         bt_choice = (Button) findViewById (R.id.bt_choice);
+        spinner = (Spinner) findViewById (R.id.spinner);
+        PermissionsUtil.checkAndRequestPermissions (this);
     }
 
     /**
@@ -115,15 +123,51 @@ public class MainActivity extends AppCompatActivity {
                 startActivityForResult (intent, CHOICE_PHOTO);//打开系统相册
             }
         });
+
+        spinner.setOnItemSelectedListener (new AdapterView.OnItemSelectedListener () { //游戏难度选择
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String level = parent.getItemAtPosition (position).toString ();
+                if (spinnerSelected) {
+                    if (level.equals ("休闲")) {
+                        setLevel (3, 5, 10);
+                    } else if (level.equals ("挑战")) {
+                        setLevel (4, 7, 50);
+                    } else {
+                        setLevel (9, 16, 100);
+                    }
+                } else {
+                    spinnerSelected = true;
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) { }
+        });
+    }
+
+    /**
+     * 难度等级设置
+     *
+     * @param rowCount    行数
+     * @param columnCount 列数
+     * @param times       切换次数
+     */
+    private void setLevel(int rowCount, int columnCount, int times) {
+        removeGameItem ();
+        gl_game_layout.setRowCount (rowCount);
+        gl_game_layout.setColumnCount (columnCount);
+        iv_game_arr = new ImageView[rowCount][columnCount];
+        setGameItem (iv_game_arr[0].length);
+        startGame (times);
     }
 
     /**
      * 初始化数据
      */
     private void initDate() {
-        photoUtil = new PhotoUtil ();
-        setGameItem ();
-        startGame ();
+        setGameItem (iv_game_arr[0].length);
+        startGame (10);
     }
 
     //回调系统相册
@@ -139,15 +183,15 @@ public class MainActivity extends AppCompatActivity {
                         BitmapDrawable bitmapDrawable = (BitmapDrawable) photo.getDrawable ();
                         bt_tupan = bitmapDrawable.getBitmap ();
                         removeGameItem ();
-                        setGameItem ();
-                        startGame ();
+                        setGameItem (iv_game_arr[0].length);
+                        startGame (10);
                     } else {
                         handleImageBeforeKitKat (data);
                         BitmapDrawable bitmapDrawable = (BitmapDrawable) photo.getDrawable ();
                         bt_tupan = bitmapDrawable.getBitmap ();
                         removeGameItem ();
-                        setGameItem ();
-                        startGame ();
+                        setGameItem (iv_game_arr[0].length);
+                        startGame (10);
                     }
                 }
         }
@@ -158,7 +202,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private void handleImageBeforeKitKat(Intent data) {
         Uri uri = data.getData ();
-        String imagePath = photoUtil.getImagePath (uri, null);
+        String imagePath = photoUtil.getImagePath (MainActivity.this,uri, null);
         displayImage (imagePath);
     }
 
@@ -175,14 +219,14 @@ public class MainActivity extends AppCompatActivity {
             if ("com.android.providers.media.documents".equals (uri.getAuthority ())) {
                 String id = docId.split (":")[1];//解析出数字格式的id;
                 String selection = MediaStore.Images.Media._ID + "=" + id;
-                imagePath = photoUtil.getImagePath (MediaStore.Images.Media.EXTERNAL_CONTENT_URI, selection);
+                imagePath = photoUtil.getImagePath (MainActivity.this,MediaStore.Images.Media.EXTERNAL_CONTENT_URI, selection);
             } else if ("com.android.providers.downloads.documents".equals (uri.getAuthority ())) {
                 Uri contenturi = ContentUris.withAppendedId (Uri.parse ("content://downloads/public_downloads"), Long.valueOf (docId));
-                imagePath = photoUtil.getImagePath (contenturi, null);
+                imagePath = photoUtil.getImagePath (MainActivity.this,contenturi, null);
             }
         } else if ("content".equalsIgnoreCase (uri.getScheme ())) {
             //如果不是document类型的uri,则使用普通的方式处理。
-            imagePath = photoUtil.getImagePath (uri, null);
+            imagePath = photoUtil.getImagePath (MainActivity.this,uri, null);
         }
         displayImage (imagePath);
     }
@@ -197,10 +241,10 @@ public class MainActivity extends AppCompatActivity {
             Bitmap bitmap = BitmapFactory.decodeFile (imagePath);
             if (photoUtil.isHeigthBigWidth (bitmap)) {
                 Bitmap bt = photoUtil.rotaingImageView (bitmap);//将图片旋转90度。
-                Bitmap disbitmapt = ajustBitmap (bt);
+                Bitmap disbitmapt = ajustBitmap (bt, iv_game_arr);
                 photo.setImageBitmap (disbitmapt);
             } else {
-                Bitmap disbitmap = ajustBitmap (bitmap);
+                Bitmap disbitmap = ajustBitmap (bitmap, iv_game_arr);
                 photo.setImageBitmap (disbitmap);
             }
         }
@@ -209,9 +253,9 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 调整图片的大小
      */
-    public Bitmap ajustBitmap(Bitmap bitmap) {
+    public Bitmap ajustBitmap(Bitmap bitmap, ImageView[][] ivArr) {
         int width = getWindowManager ().getDefaultDisplay ().getWidth () - (iv_game_arr[0].length - 1) * 2;//屏幕的宽
-        int heigth = width / 5 * 3;//高=宽/列*行 需要保证:行数*小方块宽=bitmap.getHeigth,列数*小方块宽=bitmap.getWidth
+        int heigth = width / ivArr[0].length * ivArr.length;//高=宽/列*行 需要保证:行数*小方块宽=bitmap.getHeigth,列数*小方块宽=bitmap.getWidth
         Bitmap scaledBitmap = Bitmap.createScaledBitmap (bitmap, width, heigth, true);
         return scaledBitmap;
     }
@@ -230,10 +274,10 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 切成小方块
      */
-    private void setGameItem() {
-        Bitmap abitmap = ajustBitmap (bt_tupan);
-        int ivWidth = getWindowManager ().getDefaultDisplay ().getWidth () / 5;//每个游戏小方块的宽和高。切成正方形
-        int tuWidth = abitmap.getWidth () / 5;
+    private void setGameItem(int columnCount) {
+        Bitmap abitmap = ajustBitmap (bt_tupan, iv_game_arr);
+        int ivWidth = getWindowManager ().getDefaultDisplay ().getWidth () / columnCount;//每个游戏小方块的宽和高。切成正方形
+        int tuWidth = abitmap.getWidth () / columnCount;
         for (int i = 0; i < iv_game_arr.length; i++) {
             for (int j = 0; j < iv_game_arr[0].length; j++) {
                 Bitmap bm = Bitmap.createBitmap (abitmap, j * tuWidth, i * tuWidth, tuWidth, tuWidth);//将大图切成小方块
@@ -259,7 +303,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 开始游戏
      */
-    private void startGame() {
+    private void startGame(int times) {
         tv_step.setText ("已用步数：0");
         for (i = 0; i < iv_game_arr.length; i++) {
             for (j = 0; j < iv_game_arr[0].length; j++) {
@@ -268,7 +312,7 @@ public class MainActivity extends AppCompatActivity {
         }
         //将最后一个方块设置为设置空方块。
         setNullImageView (iv_game_arr[i - 1][j - 1]);
-        randomOrder ();
+        randomOrder (times);
         isStart = true;//游戏开始
         //创建手势对象
         gestureDetector = new GestureDetector (this, new GestureDetector.OnGestureListener () {
@@ -322,8 +366,8 @@ public class MainActivity extends AppCompatActivity {
     public void changeByDirGes(int type, boolean isAnim) {
         //1.获取当前空方块的位置。
         GameItemView null_gameItemView = (GameItemView) iv_null_imagview.getTag ();
-        int new_x = null_gameItemView.getX ();
-        int new_y = null_gameItemView.getY ();
+        int new_x = null_gameItemView.x;
+        int new_y = null_gameItemView.y;
         //2.根据方向，设置相应相邻的位置坐标。
         if (type == 1) {//说明空方块在要移动的方块的上面。
             new_x++;
@@ -402,13 +446,13 @@ public class MainActivity extends AppCompatActivity {
             //得到点击方块绑定的数据
             GameItemView gameItemView = (GameItemView) itemimageView.getTag ();
             //将空方块的图案设置为点击方块
-            iv_null_imagview.setImageBitmap (gameItemView.getBm ());
+            iv_null_imagview.setImageBitmap (gameItemView.bm);
             //得到空方块绑定的数据
             GameItemView null_gameItemView = (GameItemView) iv_null_imagview.getTag ();
             //交换数据（将点击方块的数据传入空方块）
-            null_gameItemView.setBm (gameItemView.getBm ());
-            null_gameItemView.setP_x (gameItemView.getP_x ());
-            null_gameItemView.setP_y (gameItemView.getP_y ());
+            null_gameItemView.bm = gameItemView.bm;
+            null_gameItemView.p_x = gameItemView.p_x;
+            null_gameItemView.p_y = gameItemView.p_y;
             //设置当前点击的方块为空方块。
             setNullImageView (itemimageView);
             if (isStart) {
@@ -449,13 +493,13 @@ public class MainActivity extends AppCompatActivity {
                 //得到点击方块绑定的数据
                 GameItemView gameItemView = (GameItemView) itemimageView.getTag ();
                 //将空方块的图案设置为点击方块
-                iv_null_imagview.setImageBitmap (gameItemView.getBm ());
+                iv_null_imagview.setImageBitmap (gameItemView.bm);
                 //得到空方块绑定的数据
                 GameItemView null_gameItemView = (GameItemView) iv_null_imagview.getTag ();
                 //交换数据（将点击方块的数据传入空方块）
-                null_gameItemView.setBm (gameItemView.getBm ());
-                null_gameItemView.setP_x (gameItemView.getP_x ());
-                null_gameItemView.setP_y (gameItemView.getP_y ());
+                null_gameItemView.bm = gameItemView.bm;
+                null_gameItemView.p_x = gameItemView.p_x;
+                null_gameItemView.p_y = gameItemView.p_y;
                 //设置当前点击的方块为空方块。
                 setNullImageView (itemimageView);
                 if (isStart) {
@@ -491,13 +535,13 @@ public class MainActivity extends AppCompatActivity {
         //获取当前空方块的位置与点击方块的位置
         GameItemView null_gameItemView = (GameItemView) iv_null_imagview.getTag ();
         GameItemView now_gameItem_view = (GameItemView) imageView.getTag ();
-        if (null_gameItemView.getY () == now_gameItem_view.getY () && now_gameItem_view.getX () + 1 == null_gameItemView.getX ()) {//当前点击的方块在空方块的上面
+        if (null_gameItemView.y == now_gameItem_view.y && now_gameItem_view.x + 1 == null_gameItemView.x) {//当前点击的方块在空方块的上面
             return true;
-        } else if (null_gameItemView.getY () == now_gameItem_view.getY () && now_gameItem_view.getX () == null_gameItemView.getX () + 1) {//当前点击的方块在空方块的下面
+        } else if (null_gameItemView.y == now_gameItem_view.y && now_gameItem_view.x == null_gameItemView.x + 1) {//当前点击的方块在空方块的下面
             return true;
-        } else if (null_gameItemView.getY () == now_gameItem_view.getY () + 1 && now_gameItem_view.getX () == null_gameItemView.getX ()) {//当前点击的方块在空方块的左面
+        } else if (null_gameItemView.y == now_gameItem_view.y + 1 && now_gameItem_view.x == null_gameItemView.x) {//当前点击的方块在空方块的左面
             return true;
-        } else if (null_gameItemView.getY () + 1 == now_gameItem_view.getY () && now_gameItem_view.getX () == null_gameItemView.getX ()) { ////当前点击的方块在空方块的右面
+        } else if (null_gameItemView.y + 1 == now_gameItem_view.y && now_gameItem_view.x == null_gameItemView.x) { ////当前点击的方块在空方块的右面
             return true;
         }
         return false;
@@ -506,9 +550,9 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 打乱图片
      */
-    public void randomOrder() {
+    public void randomOrder(int times) {
         //交换的次数越多 难度越大
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < times; i++) {
             //根据手势，交换数据，无动画。
             int type = (int) (Math.random () * 4) + 1;
             changeByDirGes (type, false);
@@ -531,13 +575,8 @@ public class MainActivity extends AppCompatActivity {
                 GameItemView gameItemView = (GameItemView) iv_game_arr[i][j].getTag ();
                 if (!gameItemView.isTrue ()) {
                     isGameWin = false;
-                    //跳出内层循环
                     break;
                 }
-            }
-            if (!isGameWin) {
-                //跳出外层循环
-                break;
             }
         }
         //根据一个开关变量觉得游戏是否结束，结束时给提示。

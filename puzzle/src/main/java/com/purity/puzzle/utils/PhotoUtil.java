@@ -1,6 +1,6 @@
 package com.purity.puzzle.utils;
 
-import android.app.Activity;
+import android.content.Context;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
@@ -12,18 +12,18 @@ import android.provider.MediaStore;
  * @description: 图片工具
  */
 
-public class PhotoUtil extends Activity {
+public class PhotoUtil {
 
     /**
      * 得到图片的路径
      *
      * @param externalContentUri 系统相册URI
-     * @param selection 查询字段
+     * @param selection          查询字段
      * @return
      */
-    public String getImagePath(Uri externalContentUri, String selection) {
+    public String getImagePath(Context context, Uri externalContentUri, String selection) {
         String path = null;
-        Cursor cursor = getContentResolver ().query (externalContentUri, null, selection, null, null);
+        Cursor cursor = context.getContentResolver ().query (externalContentUri, null, selection, null, null);
         if (cursor != null) {
             if (cursor.moveToFirst ()) {
                 path = cursor.getString (cursor.getColumnIndex (MediaStore.Images.Media.DATA));
